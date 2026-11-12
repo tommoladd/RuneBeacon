@@ -101,6 +101,8 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 	private volatile String selectedGroupId;
 	/** True while the ping hotkey is held. */
 	private volatile boolean pingHotkeyHeld;
+	/** Client thread: whether we last told the panel we are appearing offline. */
+	private boolean appearingOffline;
 	private int clockCounter;
 
 	@Inject
@@ -183,6 +185,8 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 		beaconClient.setOnItemPing(null);
 		keyManager.unregisterKeyListener(pingHotkeyListener);
 		pingHotkeyHeld = false;
+		pingSettings.setHotkeyHeld(false);
+		pingSettings.setPvpPaused(false);
 		overlayManager.remove(tilePingOverlay);
 		tilePingOverlay.clear();
 		overlayManager.remove(inventoryPingOverlay);
@@ -233,6 +237,10 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 		if (state == GameState.LOGGING_IN || state == GameState.HOPPING)
 		{
 			collector.resetTraining();
+		}
+		if (state == GameState.LOGGING_IN)
+		{
+			collector.resetPrivateChat();
 		}
 		// No GameTicks fire outside LOGGED_IN, so push state transitions directly.
 		if (config.enabled() && state != GameState.LOGGED_IN)
@@ -345,11 +353,35 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 
 	private void sendPatch()
 	{
-		if (!beaconClient.isSocketOpen())
+		if (!beaconClient.isSocketOpen() || !collector.readyToSend())
 		{
 			return;
 		}
+		boolean hidden = collector.isHidden();
+		if (hidden != appearingOffline)
+		{
+			appearingOffline = hidden;
+			SwingUtilities.invokeLater(() ->
+			{
+				if (panel != null)
+				{
+					panel.setAppearingOffline(hidden);
+				}
+			});
+		}
 		JsonObject patch = collector.buildPatch();
+		boolean pvp = collector.isInPvp();
+		if (pvp != pingSettings.isPvpPaused())
+		{
+			pingSettings.setPvpPaused(pvp);
+			SwingUtilities.invokeLater(() ->
+			{
+				if (panel != null)
+				{
+					panel.setPvpPaused(pvp);
+				}
+			});
+		}
 		if (patch == null)
 		{
 			return;
@@ -434,7 +466,9 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
-		if (!pingHotkeyHeld || client.isMenuOpen() || !config.enabled() || !beaconClient.isSocketOpen())
+		// PvP safe mode: no pings in the Wilderness / PvP areas / PvP worlds; clicks behave normally.
+		if (!pingHotkeyHeld || client.isMenuOpen() || !config.enabled() || !beaconClient.isSocketOpen()
+			|| pingSettings.isPvpPaused())
 		{
 			return;
 		}
@@ -547,7 +581,7 @@ public class RuneBeaconPlugin extends Plugin implements GroupStore.Listener, Bea
 	 */
 	private String pingAllowed(String userId, String groupId)
 	{
-		if (!config.showPings())
+		if (!config.showPings() || pingSettings.isPvpPaused())
 		{
 			return null;
 		}

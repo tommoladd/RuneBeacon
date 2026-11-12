@@ -32,6 +32,8 @@ public class MemberState
 	private Integer weight;
 	private String spellbook;
 	private Boolean vengeance;
+	/** Appearing offline (private chat Off). */
+	private Boolean hidden;
 
 	/** skill name -> [boosted, real, xp] */
 	private Map<String, long[]> skills;

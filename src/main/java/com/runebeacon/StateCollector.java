@@ -24,10 +24,13 @@ import net.runelite.api.WorldType;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.client.util.Text;
 
 /**
  * Builds the local player's state each tick and produces patches containing only what changed
@@ -66,6 +69,12 @@ class StateCollector
 	private final Map<Skill, Integer> lastXp = new EnumMap<>(Skill.class);
 	private Skill trainingSkill;
 	private long trainingAt;
+	/** Last seen in-game private chat mode was "Off". */
+	private boolean privateChatOff;
+	/** The Private setting has been read since this login. */
+	private boolean privateChatKnown;
+	/** PvP safe mode active (Wilderness / PvP area / PvP world). */
+	private boolean inPvp;
 
 	@Inject
 	StateCollector(Client client, RuneBeaconConfig config, RegionData regionData, Gson gson)
@@ -135,8 +144,94 @@ class StateCollector
 		return patch;
 	}
 
+	/**
+	 * True while we're appearing offline because the in-game private chat is Off. Read by the
+	 * plugin (client thread) to update the panel.
+	 */
+	boolean isHidden()
+	{
+		return config.matchPrivateChat() && privateChatOff;
+	}
+
+	/**
+	 * Track the in-game private chat mode from the chatbox's "Private" button text ("On",
+	 * "Friends" or "Off"). If the widget isn't available (loading, chatbox not built yet) the last
+	 * known mode is kept.
+	 */
+	private void updatePrivateChatMode()
+	{
+		Widget w = client.getWidget(InterfaceID.Chatbox.CHAT_PRIVATE_FILTER);
+		if (w == null || w.getText() == null)
+		{
+			return;
+		}
+		String mode = Text.removeTags(w.getText()).trim();
+		if (!mode.isEmpty())
+		{
+			privateChatOff = mode.equalsIgnoreCase("Off");
+			privateChatKnown = true;
+		}
+	}
+
+	/**
+	 * Whether it's safe to send state: when matching private chat, wait until we've read the
+	 * Private setting at least once, so we never briefly show as online before hiding.
+	 */
+	boolean readyToSend()
+	{
+		updatePrivateChatMode();
+		return !config.matchPrivateChat() || privateChatKnown;
+	}
+
+	/** New login (possibly another account): re-read the private chat setting before sending. */
+	void resetPrivateChat()
+	{
+		privateChatKnown = false;
+		privateChatOff = false;
+	}
+
+	/** World types where the whole world counts as PvP for safe mode. */
+	private static final java.util.Set<WorldType> PVP_WORLD_TYPES = java.util.EnumSet.of(
+		WorldType.PVP, WorldType.HIGH_RISK, WorldType.DEADMAN, WorldType.BOUNTY,
+		WorldType.PVP_ARENA, WorldType.LAST_MAN_STANDING);
+
+	/** In the Wilderness, any PvP area, or on a PvP-type world. Client thread. */
+	private boolean isInPvpArea()
+	{
+		if (client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1
+			|| client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1)
+		{
+			return true;
+		}
+		for (WorldType t : client.getWorldType())
+		{
+			if (PVP_WORLD_TYPES.contains(t))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Whether PvP safe mode was active at the last collection. Client thread. */
+	boolean isInPvp()
+	{
+		return inPvp;
+	}
+
 	private Map<String, JsonElement> collect()
 	{
+		updatePrivateChatMode();
+		inPvp = client.getGameState() == GameState.LOGGED_IN && isInPvpArea();
+		if (isHidden())
+		{
+			// Appear offline: send nothing but the flag. Every other key we sent before becomes
+			// null in the patch, which clears our location/stats on the server and other clients.
+			Map<String, JsonElement> hidden = new HashMap<>();
+			hidden.put("hidden", gson.toJsonTree(true));
+			return hidden;
+		}
+
 		Map<String, JsonElement> s = new HashMap<>();
 		GameState gameState = client.getGameState();
 		s.put("gameState", gson.toJsonTree(gameStateName(gameState)));
@@ -169,6 +264,17 @@ class StateCollector
 		if (!status.isEmpty())
 		{
 			s.put("status", gson.toJsonTree(status.length() > STATUS_MAX ? status.substring(0, STATUS_MAX) : status));
+		}
+
+		// PvP safe mode (always on): in the Wilderness, a PvP area or on a PvP-type world, share only
+		// that we're online, our world and a generic label. Everything else becomes null in the
+		// patch, so it's removed from the server and from group members' screens.
+		if (inPvp)
+		{
+			boolean wilderness = client.getVarbitValue(VarbitID.INSIDE_WILDERNESS) == 1;
+			s.put("area", gson.toJsonTree(wilderness ? "Wilderness" : "PvP world"));
+			s.put("combatLevel", gson.toJsonTree(local.getCombatLevel()));
+			return s;
 		}
 
 		WorldPoint wp = playerLocation(local);

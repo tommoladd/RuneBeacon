@@ -30,6 +30,11 @@ public class PingSettings
 	@lombok.Setter
 	private volatile boolean hotkeyHeld;
 
+	/** PvP safe mode: we're in the Wilderness / a PvP area / on a PvP world, so pings are off. */
+	@lombok.Getter
+	@lombok.Setter
+	private volatile boolean pvpPaused;
+
 	/**
 	 * Is this panel click a "ping click"? True while the hotkey is held, or — because the side
 	 * panel doesn't receive game key events — when a modifier-only hotkey (Shift/Ctrl/Alt) is

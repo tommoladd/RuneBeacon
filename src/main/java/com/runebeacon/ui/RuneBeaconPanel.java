@@ -50,6 +50,8 @@ public class RuneBeaconPanel extends PluginPanel implements MemberCard.Actions
 
 	private final JLabel statusLabel = new JLabel();
 	private final JLabel statusDetail = new JLabel();
+	private final JLabel appearingOfflineLabel = new JLabel("<html>Appearing offline to your groups:<br>your in-game private chat is Off.</html>");
+	private final JLabel pvpPausedLabel = new JLabel("<html>PvP area: sharing paused.<br>Only your online status and world are shared.</html>");
 	private final JButton retryButton = new JButton("Retry");
 	private final JComboBox<Group> groupBox = new JComboBox<>();
 	private final JButton manageButton = new JButton("Manage");
@@ -88,6 +90,16 @@ public class RuneBeaconPanel extends PluginPanel implements MemberCard.Actions
 		statusDetail.setFont(FontManager.getRunescapeSmallFont());
 		statusDetail.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		top.add(left(statusDetail));
+		appearingOfflineLabel.setFont(FontManager.getRunescapeSmallFont());
+		appearingOfflineLabel.setForeground(UiUtil.IDLE);
+		appearingOfflineLabel.setToolTipText("Set private chat to On or Friends to appear online, or turn off \"Match private chat setting\" in the RuneBeacon settings.");
+		appearingOfflineLabel.setVisible(false);
+		top.add(left(appearingOfflineLabel));
+		pvpPausedLabel.setFont(FontManager.getRunescapeSmallFont());
+		pvpPausedLabel.setForeground(UiUtil.IDLE);
+		pvpPausedLabel.setToolTipText("In the Wilderness, PvP areas and on PvP worlds RuneBeacon stops sharing your location, stats, gear and inventory, and pings are turned off.");
+		pvpPausedLabel.setVisible(false);
+		top.add(left(pvpPausedLabel));
 		retryButton.addActionListener(e -> onRetry.run());
 		top.add(left(retryButton));
 		if (client.isDeveloperMode())
@@ -210,6 +222,22 @@ public class RuneBeaconPanel extends PluginPanel implements MemberCard.Actions
 	}
 
 	// ------------------------------------------------------------------ updates (EDT)
+
+	/** Show or hide the PvP safe mode notice. */
+	public void setPvpPaused(boolean paused)
+	{
+		pvpPausedLabel.setVisible(paused);
+		revalidate();
+		repaint();
+	}
+
+	/** Show or hide the "appearing offline" notice (private chat is Off). */
+	public void setAppearingOffline(boolean hidden)
+	{
+		appearingOfflineLabel.setVisible(hidden);
+		revalidate();
+		repaint();
+	}
 
 	public void statusChanged(BeaconClient.Status status, String detail)
 	{
@@ -754,6 +782,11 @@ public class RuneBeaconPanel extends PluginPanel implements MemberCard.Actions
 	@Override
 	public void pingItem(Group group, Member member, int slot, int itemId, String itemName)
 	{
+		if (services.getPingSettings().isPvpPaused())
+		{
+			showError("Pings are paused while you're in the Wilderness, a PvP area or on a PvP world.");
+			return;
+		}
 		if (!client.sendItemPing(group.getGroupId(), member.getUserId(), slot, itemId))
 		{
 			showError("Not connected to the RuneBeacon server");

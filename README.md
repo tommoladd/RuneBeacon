@@ -26,6 +26,17 @@ RuneBeacon needs the RuneBeacon server at `beacon.tommoladd.dev`, so it is **off
 **What is sent:** your own status, and only the categories you leave switched on under the *Sharing* settings (location, activity, vitals, skills, inventory, equipment, prayers). Turning a
 category off also removes it from the server. RuneBeacon never sends information about other players, apart from the name you type (or right-click) when you invite someone.
 
+**Appearing offline:** RuneBeacon follows your in-game **private chat** setting. While it is set to
+**Off** you appear offline to your groups, and your location, stats and map pin are removed, just as
+you appear offline to your friends list. **On** or **Friends** shows you online. You can turn this
+off with *Match private chat setting*.
+
+**PvP safe mode (always on):** in the Wilderness, in PvP areas and on PvP-type worlds (PvP, High Risk,
+Deadman, Bounty Hunter, PvP Arena, Last Man Standing), RuneBeacon shares only that you're online,
+your world and "In the Wilderness" / "On a PvP world". Your location, map pin, HP, prayer, stats,
+gear, inventory and prayers are removed until you leave, and tile and item pings are turned off.
+RuneBeacon can't be used to scout or coordinate in PvP.
+
 **What the server stores:**
 
 | Data | Why | How long |

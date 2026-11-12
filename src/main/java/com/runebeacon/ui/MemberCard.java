@@ -324,8 +324,16 @@ class MemberCard extends JPanel
 		String role = owner ? "Group owner" : perms.isEmpty() ? null : "Permissions: " + describe(perms);
 		name.setToolTipText(who == null ? role : role == null ? who : who + " - " + role);
 
-		presence.setText(UiUtil.presenceText(member, s));
-		presence.setForeground(UiUtil.presenceColor(member, s));
+		if (isSelf && UiUtil.isHidden(s))
+		{
+			presence.setText("Appearing offline");
+			presence.setForeground(UiUtil.IDLE);
+		}
+		else
+		{
+			presence.setText(UiUtil.presenceText(member, s));
+			presence.setForeground(UiUtil.presenceColor(member, s));
+		}
 
 		// Second line: "Lvl 126 · Fighting Vorkath"
 		String doingText = UiUtil.doing(s);

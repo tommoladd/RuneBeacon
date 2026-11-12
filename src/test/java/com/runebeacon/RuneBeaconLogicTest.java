@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.runebeacon.model.Group;
+import com.runebeacon.model.Member;
 import com.runebeacon.model.MemberState;
 import com.runebeacon.model.Permission;
 import com.runebeacon.model.Permissions;
@@ -128,6 +129,27 @@ public class RuneBeaconLogicTest
 		assertTrue(Permissions.canKick(asOwner, asOwner.findMember("peer"), "owner"));
 		assertFalse(Permissions.canKick(asOwner, asOwner.findMember("owner"), "owner"));
 		assertTrue(Permissions.canGrant(asOwner, EnumSet.allOf(Permission.class)));
+	}
+
+	@Test
+	public void hiddenMembersShowAsOffline()
+	{
+		GroupStore store = new GroupStore(gson);
+		Group g = gson.fromJson("{\"groupId\":\"g1\",\"name\":\"Friends\",\"type\":\"permanent\",\"myRole\":\"member\","
+			+ "\"members\":[{\"userId\":\"u1\",\"rsn\":\"A\",\"role\":\"member\",\"online\":true,\"lastSeen\":1000}]}", Group.class);
+		store.setGroups(Collections.singletonList(g));
+		Member m = g.findMember("u1");
+
+		store.applyPatch("u1", json("{\"gameState\":\"LOGGED_IN\",\"world\":302,\"loc\":{\"x\":3200,\"y\":3200,\"plane\":0}}"));
+		assertTrue(com.runebeacon.ui.UiUtil.isLoggedIn(m, store.getState("u1")));
+
+		// Private chat set to Off: everything else is nulled and the member must read as offline.
+		store.applyPatch("u1", json("{\"hidden\":true,\"gameState\":null,\"world\":null,\"loc\":null}"));
+		MemberState s = store.getState("u1");
+		assertTrue(com.runebeacon.ui.UiUtil.isHidden(s));
+		assertFalse(com.runebeacon.ui.UiUtil.isLoggedIn(m, s));
+		assertNull(s.getLoc());
+		assertTrue(com.runebeacon.ui.UiUtil.presenceText(m, s).startsWith("Seen"));
 	}
 
 	@Test

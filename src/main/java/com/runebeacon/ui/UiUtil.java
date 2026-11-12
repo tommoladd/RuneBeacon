@@ -83,9 +83,15 @@ public final class UiUtil
 		return Color.getHSBColor(hue, 0.65f, 0.95f);
 	}
 
+	/** Member is appearing offline (their private chat is Off). */
+	public static boolean isHidden(MemberState s)
+	{
+		return s != null && Boolean.TRUE.equals(s.getHidden());
+	}
+
 	public static boolean isLoggedIn(Member m, MemberState s)
 	{
-		return m.isOnline() && s != null && !"LOGIN_SCREEN".equals(s.getGameState());
+		return m.isOnline() && s != null && !isHidden(s) && !"LOGIN_SCREEN".equals(s.getGameState());
 	}
 
 	public static Color presenceColor(Member m, MemberState s)
@@ -99,7 +105,7 @@ public final class UiUtil
 
 	public static String presenceText(Member m, MemberState s)
 	{
-		if (!m.isOnline())
+		if (!m.isOnline() || isHidden(s))
 		{
 			return m.getLastSeen() == null ? "Offline" : "Seen " + timeAgo(m.getLastSeen());
 		}
@@ -123,6 +129,15 @@ public final class UiUtil
 			return null;
 		}
 		String where = s.getArea();
+		// PvP safe mode sends only a generic label and no location.
+		if (s.getLoc() == null && "Wilderness".equals(where))
+		{
+			return "In the Wilderness";
+		}
+		if (s.getLoc() == null && "PvP world".equals(where))
+		{
+			return "On a PvP world";
+		}
 		if (s.getActivity() != null && s.getActivity().getName() != null)
 		{
 			String verb;

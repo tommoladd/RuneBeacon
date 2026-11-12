@@ -63,6 +63,14 @@ public interface RuneBeaconConfig extends Config
 	)
 	String sharingSection = "sharing";
 
+	@ConfigItem(keyName = "matchPrivateChat", name = "Match private chat setting",
+		description = "Appear offline to your groups while your in-game private chat is set to Off "
+			+ "(On or Friends shows you online)", section = sharingSection, position = 10)
+	default boolean matchPrivateChat()
+	{
+		return true;
+	}
+
 	@ConfigItem(keyName = "shareLocation", name = "Location & area", description = "Share your map position and area name", section = sharingSection, position = 11)
 	default boolean shareLocation()
 	{

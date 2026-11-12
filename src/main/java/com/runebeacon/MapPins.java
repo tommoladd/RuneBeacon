@@ -99,7 +99,7 @@ class MapPins
 					continue;
 				}
 				MemberState s = store.getState(m.getUserId());
-				if (s == null || s.getLoc() == null)
+				if (s == null || s.getLoc() == null || UiUtil.isHidden(s))
 				{
 					continue;
 				}
